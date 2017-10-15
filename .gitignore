@@ -1,2 +1,5 @@
 /modules.cfg
 /packages.cfg
+/PackageInstaller.log
+/ModuleInstaller.log
+/Install.py.log
