@@ -22,3 +22,25 @@ puppet: puppet
 * -m specifies which section of the modules.cfg entries you want to install
 * -a specifies which section of the packages.cfg entries you want to install
 * -l specifies the logging level (one of CRITICAL, ERROR, WARNING, INFO, DEBUG)
+
+## Vagrantfile example
+```
+Vagrant.configure("2") do |config|
+	config.vm.define  "pcp1976-ddns-net" do |pcp1976|
+		pcp1976.vm.box = "bento/ubuntu-16.04"
+		pcp1976.vm.network "private_network", ip: "192.168.100.94"
+		pcp1976.vm.provider "virtualbox" do |vb|
+			vb.memory = "2048"
+      		vb.name = "pcp1976-ddns-net"
+      		vb.cpus = 2
+		end
+		pcp1976.vm.provision :shell do |modules|
+			modules.path = 'script/install.py'
+			modules.args = '-m pcp1976 -a pcp1976 -l DEBUG'
+		end
+		pcp1976.vm.provision "puppet" do |puppet|
+			puppet.manifest_file = "default.pp"
+		end
+	end
+end
+```
