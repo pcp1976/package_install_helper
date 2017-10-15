@@ -21,4 +21,4 @@ puppet: puppet
 ## Script configuration
 * -m specifies which section of the modules.cfg entries you want to install
 * -a specifies which section of the packages.cfg entries you want to install
-* -l specifies the logging level (one of ERROR, WARNING, INFO, DEBUG)
+* -l specifies the logging level (one of CRITICAL, ERROR, WARNING, INFO, DEBUG)
