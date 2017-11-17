@@ -19,12 +19,16 @@ def build_logger(name, level):
         logger.addHandler(ch)
     
 class PackageInstaller(object):
-    def __init__(self, defaults, level):
+    def __init__(self, defaults, level, ini):
         build_logger('PackageInstaller', level)
         self.logger = logging.getLogger('PackageInstaller')
         self.logger.debug('Entered __init__()')
         self.config = ConfigParser.ConfigParser()
-        self.config.readfp(open('/vagrant/script/packages.cfg'))
+        try:
+            self.config.readfp(open(ini))
+        except Exception as e:
+            self.logger.error("Could not open config file for PackageInstaller")
+            exit(1)
         self.logger.debug('open packages.cfg')
         self.apt_pkg_names = self.config.items(defaults)
         pkg_report = [] 
@@ -78,11 +82,15 @@ class PackageInstaller(object):
                 self.logger.error('apt-get update returned {exit_code}, install may fail'.format(exit_code=exit_code))
 
 class ModuleInstaller(object):
-    def __init__(self, defaults, level):
+    def __init__(self, defaults, level, ini):
         build_logger('ModuleInstaller', level)
         self.logger = logging.getLogger('ModuleInstaller')
         self.config = ConfigParser.ConfigParser()
-        self.config.readfp(open('/vagrant/script/modules.cfg'))
+        try:
+            self.config.readfp(open(ini))
+        except Exception as e:
+            self.logger.error("Could not open config file for ModuleInstaller")
+            exit(1)
         self.modules_names = self.config.items(defaults)
 
     def install_module(self, pkg_name):
@@ -104,7 +112,9 @@ class ModuleInstaller(object):
 def main(args):
     parser = argparse.ArgumentParser()
     parser.add_argument('-a', action='store', dest='apt_packages', help='package set to install')
+    parser.add_argument('-x', action='store', dest='apt_ini', help='apt packages ini file path')
     parser.add_argument('-m', action='store', dest='puppet_modules', help='puppet modules to install')
+    parser.add_argument('-y', action='store', dest='puppet_ini', help='puppet modules ini file path')
     parser.add_argument('-l', action='store', dest='log_level', help='logging level ("CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG")', default='INFO')
     a = parser.parse_args(args)
     build_logger('Install.py', a.log_level)
@@ -128,14 +138,14 @@ def main(args):
     
     if a.apt_packages is not None:
         logger.info("Instaling apt {apt_packages} package set".format(apt_packages=a.apt_packages))
-        installer = PackageInstaller(a.apt_packages, a.log_level)
+        installer = PackageInstaller(a.apt_packages, a.log_level, a.apt_ini)
         installer.do_install()
     else:
         logger.warn('no apt packages in this run')
     
     if a.puppet_modules is not None:
         logger.info("Instaling puppet {apt_packages} module set".format(apt_packages=a.puppet_modules))    
-        installer = ModuleInstaller(a.puppet_modules, a.log_level)
+        installer = ModuleInstaller(a.puppet_modules, a.log_level, a.puppet_ini)
         installer.do_install()
     else:
         logger.warn('no puppet modules in this run')
