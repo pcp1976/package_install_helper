@@ -1,7 +1,15 @@
 #!/usr/bin/env python
 # install.py
 
-import sys, subprocess, ConfigParser, os, argparse, logging
+import sys
+import subprocess
+import ConfigParser
+import os
+import argparse
+import logging
+
+apt = None
+
 
 def build_logger(name, level):
     logger = logging.getLogger(name)
@@ -17,7 +25,8 @@ def build_logger(name, level):
         ch.setFormatter(formatter)
         logger.addHandler(fh)
         logger.addHandler(ch)
-    
+
+
 class PackageInstaller(object):
     def __init__(self, defaults, level, ini):
         build_logger('PackageInstaller', level)
@@ -37,7 +46,6 @@ class PackageInstaller(object):
         self.logger.info('apt_pkg_names={pkg_report}'.format(pkg_report=pkg_report))
         self.logger.debug('exit __init__()')    
 
-        
     def install_apt(self, pkg_name):
         self.logger.debug('entered install_apt')
         pkg = self.cache[pkg_name]
@@ -51,7 +59,7 @@ class PackageInstaller(object):
     def do_install(self):
         self.logger.debug('entered do_install')
         need_to_do_update=False
-        check_cmd='dpkg --get-selections'
+        check_cmd = 'dpkg --get-selections'
         installed_output = subprocess.check_output(check_cmd, shell=True)
         for pkg in self.apt_pkg_names:
             self.logger.debug('checking if {pkg} installed'.format(pkg=pkg[1]))
@@ -61,25 +69,26 @@ class PackageInstaller(object):
                 self.logger.info('need to update')
 
         if need_to_do_update:
-            update_command="sudo apt-get update"
+            update_command = "sudo apt-get update"
             exit_code = subprocess.Popen(update_command, shell=True).wait()
             
-            if exit_code==0:
+            if exit_code == 0:
                 self.logger.info('got {exit_code} from apt-get update'.format(exit_code=exit_code))
-                self.cache = apt.cache.Cache()
-                self.cache.update()
+                cache = apt.cache.Cache()
+                cache.update()
                 self.logger.debug('updated apt cache')
 
                 for pkg in self.apt_pkg_names:
                     self.install_apt(pkg[1])
                 try:
                     self.logger.info('committing cache')
-                    self.cache.commit()
-                    self.logger.info('cache commited')
-                except Exception, arg:
+                    cache.commit()
+                    self.logger.info('cache committed')
+                except Exception as arg:
                     self.logger.error("Sorry, package installation failed [{err}]".format(err=str(arg)))
             else:
                 self.logger.error('apt-get update returned {exit_code}, install may fail'.format(exit_code=exit_code))
+
 
 class ModuleInstaller(object):
     def __init__(self, defaults, level, ini):
@@ -93,7 +102,8 @@ class ModuleInstaller(object):
             exit(1)
         self.modules_names = self.config.items(defaults)
 
-    def install_module(self, pkg_name):
+    @staticmethod
+    def install_module(pkg_name):
         os.system("sudo puppet module install " + pkg_name)
     
     def do_install(self):
@@ -108,47 +118,56 @@ class ModuleInstaller(object):
                 self.install_module(pkg[1])
             else:
                 self.logger.info('{mod} module already installed, leaving'.format(mod=str(pkg[1])))
-                
+
+
 def main(args):
     parser = argparse.ArgumentParser()
     parser.add_argument('-a', action='store', dest='apt_packages', help='package set to install')
     parser.add_argument('-x', action='store', dest='apt_ini', help='apt packages ini file path')
     parser.add_argument('-m', action='store', dest='puppet_modules', help='puppet modules to install')
     parser.add_argument('-y', action='store', dest='puppet_ini', help='puppet modules ini file path')
-    parser.add_argument('-l', action='store', dest='log_level', help='logging level ("CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG")', default='INFO')
+    parser.add_argument(
+        '-l',
+        action='store',
+        dest='log_level',
+        help='logging level',
+        choices=["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG"],
+        default='INFO'
+    )
     a = parser.parse_args(args)
     build_logger('Install.py', a.log_level)
     logger = logging.getLogger('Install.py')
     global apt
     try:
         import apt as apt
-    except:
-        logger.info("Instaling python-apt")
+    except ImportError:
+        logger.info("Installing python-apt")
         try:
-            update_command="sudo apt-get update && sudo apt-get install python-apt"
+            update_command = "sudo apt-get update && sudo apt-get install python-apt"
             exit_code = subprocess.Popen(update_command, shell=True).wait()
             logger.info("Exit code: {exit_code}".format(exit_code=exit_code))
-            if(exit_code == 0):
+            if exit_code == 0:
                 import apt as apt
             else:
                 raise Exception("Return code {exit_code} not 0 whilst attempting to install python-apt".format(exit_code==exit_code))
-        except Exception, e:
+        except Exception as e:
             logger.critical("Could not install python-apt: {msg}".format(msg==str(e)))
             sys.exit("Could not install python-apt")
     
     if a.apt_packages is not None:
-        logger.info("Instaling apt {apt_packages} package set".format(apt_packages=a.apt_packages))
+        logger.info("Installing apt {apt_packages} package set".format(apt_packages=a.apt_packages))
         installer = PackageInstaller(a.apt_packages, a.log_level, a.apt_ini)
         installer.do_install()
     else:
         logger.warn('no apt packages in this run')
     
     if a.puppet_modules is not None:
-        logger.info("Instaling puppet {apt_packages} module set".format(apt_packages=a.puppet_modules))    
+        logger.info("Installing puppet {apt_packages} module set".format(apt_packages=a.puppet_modules))
         installer = ModuleInstaller(a.puppet_modules, a.log_level, a.puppet_ini)
         installer.do_install()
     else:
-        logger.warn('no puppet modules in this run')
-    
+        logger.warning('no puppet modules in this run')
+
+
 if __name__ == "__main__":
     main(sys.argv[1:])
